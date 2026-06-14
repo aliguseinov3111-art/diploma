@@ -1,0 +1,1072 @@
+var start_page_tstamp = GetCurrentTstamp();
+var omni_autocaptcha_sec = 15;
+Date.prototype.stdTimezoneOffset = function () {
+    var jan = new Date(this.getFullYear(), 0, 1);
+    var jul = new Date(this.getFullYear(), 6, 1);
+    return Math.max(jan.getTimezoneOffset(), jul.getTimezoneOffset());
+}
+
+Date.prototype.isDstObserved = function () {
+    return this.getTimezoneOffset() < this.stdTimezoneOffset();
+}
+function InitCfDatepickers(b_all,b_set_event, lang = null)
+{
+    var regional = {};
+
+    if(lang)
+    {
+      regional = $.datepicker.regional[lang] ? $.datepicker.regional[lang] : $.datepicker.regional['en'];
+    }
+    //DATE//
+    $('#temp_period_date, .input_calendar_ico>input'+(!b_all ? ':visible' : '')+':not([data-b_inited_date])').each(function () {
+
+        var _self = $(this);
+        if ($(this).parent().siblings('.fa.fa-eraser')
+            && $(this).filter(':disabled').length
+        )
+        {
+            $(this).parent().find('i').hide();
+        }
+        if($(this).filter(':disabled').length)
+        {
+            return;
+        }
+
+        $(this).attr('readonly','readonly').css('cursor','pointer');
+        $(this).attr('data-b_set_event',b_set_event?1:0);
+        $(this).attr('data-b_inited_date',1);
+        var val = $(this).val().split('.');
+        var dp = $(this).datepicker($.extend({}, lang ? {'language': regional} : {},{
+            // minutesStep:5,
+            // timepicker: true,
+            dateFormat: 'dd.mm.yyyy',
+            // startDate: new Date(val[2], val[1] - 1, val[0]),
+            range: false,
+		    multipleDatesSeparator : " — ",
+            autoClose: true,
+            onShow: function (inst) {
+                if ($(inst.el).hasClass('custom_disabled'))
+                {
+                    dp.data('datepicker').hide();
+                    return false;
+                }
+                // custom_disabled
+                var parent_container = $(inst.el).parents('.sidebar-inner-request-filters');
+
+                if ($(parent_container).length)
+                {
+                    var dropdown_height = 240;
+                    var height = $(parent_container).height();
+                    var pos = $(inst.el).offset().top - $($(parent_container)).offset().top;
+                    var height_before = pos - dropdown_height;
+                    var height_after = height - pos - dropdown_height;
+                    if (height_before > height_after && height_after < 0)
+                    {
+                        inst.update({position: "top left"})
+                    }
+                    else
+                    {
+                        inst.update({position: "bottom left"})
+                    }
+                }
+            },
+            onSelect: function (formattedDate, date, inst) {
+                // добавил autoClose: true, потому что при выборе периода(range: true) пикер закрівается после первой даты
+                // inst.hide();
+                // console.log('onselect');
+                $(_self).parent().find('i.fa-calendar').hide();
+                $(_self).parent().find('i.fa-calendar-alt').hide();
+                $(_self).parent().find('i.fa-times').show();
+                $(_self).attr('data-change',_self[0].value.length ? 1 : 0);
+
+                //добавил 22.07.2024, т.к. оно триггериться из scroll.js (только в чате......)
+                if(!($('.chat_chat_msg_win_wrap').length && $(_self).parents('.sidebar-inner').length)
+                || !$(_self).parents('.sidebar-inner').length
+                )
+                {
+                    // console.log('jjjjjjjj');
+                    //закомментил 22.07.2024, т.к. оно триггериться в любой пикере, даже если он не относиться к параметрам тикета
+
+                    // if (window.UpdateCaseParams)
+                    // {
+                    //     setTimeout(function () {
+                    //         UpdateCaseParams();
+                    //     }, 500)
+                    // }
+                    // else
+                    if (window.activeButt && $(_self).parents('.sidebar-inner').length)
+                    {
+                        activeButt();
+                    }
+                    if (window.CheckCustomFieldsParentFields &&
+                        (!$(_self).attr('data-b_set_event') || $(_self).parents('.sidebar-inner').length))
+                    {
+                        CheckCustomFieldsParentFields({'target': _self});
+                    }
+                }
+                if($(_self).attr('data-b_set_event'))
+                {
+                    $(_self).change();
+                }
+            }
+        }));
+        if(val[1])
+        {
+            // console.log('SET');
+            dp.data('datepicker').selectDate(new Date(val[2], val[1] - 1, val[0]),true);
+            if (window.CheckCustomFieldsParentFields)
+            {
+                CheckCustomFieldsParentFields({'target':_self});
+            }
+
+        }
+        else
+        {
+            dp.data('datepicker').clear();
+            $(this).val('');
+            $(this).attr('data-change',0);
+
+        }
+        if($(this).parent().find('i.fa-calendar,i.fa-calendar-alt').length)
+        {
+            if(!$(this).parent().find('i.fa-times').length)
+            {
+                $(this).parent().append('<i class="fa fa-times" style="display: none; color: #a5a5a5;"></i>');
+            }
+            $(this).parent().find('i.fa-calendar,i.fa-calendar-alt')[0].onclick = function () {
+                dp.data('datepicker').show();
+            };
+            $(this).parent().find('i.fa-times')[0].onclick = function (e) {
+                e.preventDefault(); e.stopPropagation();
+                _self.val('');
+                _self.attr('data-change',0);
+                dp.data('datepicker').clear();
+                CheckCustomFieldsParentFields({'target': _self});
+                if (window.activeButt && $(_self).parents('.sidebar-inner').length)
+                {
+                    activeButt();
+                }
+                if(_self.parents('#user_case_params_form').length)
+                {
+                    let custom_fields_data = GetCustomFieldsData('user_case_params_form');
+                    xAjaxCall('DynamicSaveParams',[$('input[name=case_id]').val(),custom_fields_data],function (obj) {
+
+                    });
+
+                }
+                $(this).parent().find('i.fa-calendar').show();
+                $(this).parent().find('i.fa-calendar-alt').show();
+                $(this).parent().find('i.fa-times').hide();
+            };
+            if(val[1])
+           {
+               $(this).parent().find('i.fa-calendar').hide();
+               $(this).parent().find('i.fa-calendar-alt').hide();
+               $(this).parent().find('i.fa-times').show();
+           }
+        }
+    });
+
+
+}
+function GenUid(len)
+{
+    // return Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, len);
+
+    var result           = '';
+    var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    var charactersLength = characters.length;
+    for ( var i = 0; i < len; i++ ) {
+        result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
+}
+function GetUidPage(pref)
+{
+    return md5(window.location.pathname+(pref ? '_'+pref : ''));
+}
+function getQueryParam(param) {
+    const queryString = window.location.search.substring(1); // Убираем "?"
+    const params = queryString.split("&"); // Разбиваем параметры
+
+    for (let i = 0; i < params.length; i++) {
+        const pair = params[i].split("="); // Разбиваем ключ и значение
+        if (pair[0] === param) {
+            return decodeURIComponent(pair[1]); // Декодируем значение
+        }
+    }
+    return null; // Если параметр не найден
+}
+
+function StripTags(str)
+{
+
+    return str ? str.replace(/<\/?[^>]+>/gi, '').replace(/&#x200b;/gi,'') : '';
+}
+function StripHtmlComment(str)
+{
+    return str ? str.replace(/<!--[\s\S]*?-->/g,'').trim() : '';
+}
+function EscapeHtml(str,igrone_tags) {
+    if(!igrone_tags)
+    {
+        igrone_tags = [];
+    }
+    igrone_tags.push('br');
+    for (let i in igrone_tags)
+    {
+        let k = '###html_'+igrone_tags[i].replace(/\//g,'end_')+'###';
+        str = str.replace(new RegExp('<'+igrone_tags[i]+'\s*\/*>', 'g'),k)
+    }
+    var entityMap = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '/': '&#x2F;',
+        '`': '&#x60;',
+        '=': '&#x3D;'
+    };
+
+    str = String(str).replace(/[&<>"'`=\/]/g, function (s) {
+        return entityMap[s];
+    });
+    for (let i in igrone_tags)
+    {
+        let k = '###html_'+igrone_tags[i].replace(/\//g,'end_')+'###';
+        str = str.replace(new RegExp(k, 'g'),'<'+igrone_tags[i]+'>')
+    }
+    return str;
+
+}
+
+function GetCurrentTstamp()
+{
+    return parseInt(Date.now()/1000);
+
+}
+function AutoExpandField(field,min,max)
+{
+    var h = field.style.height;
+    field.style.height = 'inherit';
+
+    // Get the computed styles for the element
+    var computed = window.getComputedStyle(field);
+
+    // Calculate the height
+    var height = parseInt(computed.getPropertyValue('border-top-width'), 10)
+        + parseInt(computed.getPropertyValue('padding-top'), 10)
+        + field.scrollHeight
+        + parseInt(computed.getPropertyValue('padding-bottom'), 10)
+        + parseInt(computed.getPropertyValue('border-bottom-width'), 10);
+
+    if((min && height<min)
+        || (max && height>max)
+    )
+    {
+        field.style.height = h
+    }
+    else
+    {
+        field.style.height = height + 'px';
+    }
+    if(window.session_id !== undefined) {
+        if(window.mainContMinH())
+        {
+            mainContMinH();
+        }
+    }
+
+
+}
+
+function xAjaxCall(f,arg,callback,b_abort)
+{
+    if(b_abort
+        && xajax_process['ajax_'+f] )
+    {
+        xajax.abortRequest(xajax_process['ajax_'+f])
+    }
+
+    var params = { parameters: arg };
+    if(callback)
+    {
+        var cb = xajax.callback.create();
+        cb.onComplete = callback;
+
+        params['callback'] = cb;
+    }
+    return xajax.request( { xjxfun: 'ajax_'+f }, params );
+}
+
+/**
+ * Convert HTML code to plain text.
+ *
+ * This function converts the html into plain text that is usable for marketing purposes,
+ * so it supports things like bullet points and numbering.  It also supports a "hide-text" class,
+ * which you can use to hide elements from the plain text version.
+ */
+function html2Text( html )
+{
+    var tagRegexp;
+
+    // the following tags will be removed, but their contents will be maintained
+    var tags_unwrap = [ 'a', 'b', 'span', 'i', 'em', 'u', 'strong', 'sup', 'center', 'font' ];
+
+    // the following tags will be stripped, as well as their contents
+    var tags_strip  = [ 'iframe', 'img', 'script', 'style', 'link', 'object', 'embed', 'table','figure','span'];
+
+    // the following tags will include white space below
+    var tags_block_level = [ 'p', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6' ];
+
+    for( var i in tags_block_level )
+    {
+        tagRegexp = new RegExp( '\s+(\<'+tags_block_level[i]+'\>)' );
+        html = html.replace( tagRegexp, '$1' );
+    }
+
+    // strip excess white space
+    html = html.replace( /(\r\n|\r|\n)\s+/g, '\n' );
+
+    tagRegexp = new RegExp( '\s*(<\/('+tags_block_level.concat(['div']).join('|')+')\s*>)\s+', 'gi' );
+    html = html.replace( tagRegexp, '$1' );
+
+    tagRegexp = new RegExp( '\s*(<('+tags_block_level.concat(['div']).join('|')+')(\s+[^>]+){0,1}>)\s+', 'gi' );
+    html = html.replace( tagRegexp, '$1' );
+
+    html = html.replace( /(\r\n|\r|\n)/g, '' );
+    html = html.replace( /\s+/g, ' ' );
+
+    // wrap in a div to allow modification
+    $element = $( '<div>'+html+'</div>' );
+
+    // we can add things to our html that we may want to exclude from the text
+    // like call to action links
+    $( '.hide-text', $element ).remove();
+
+    // strip all the following tags, but keep the contents
+    $( tags_unwrap.join(', '), $element ).each( function(){
+        if(this.tagName == 'A')
+        {
+            $( this ).replaceWith( $( this ).attr('href') );
+        }
+        else
+        {
+            $( this ).replaceWith( $( this ).html() );
+        }
+    });
+
+    // strip all the following tags, but keep the contents and add line breaks
+    $( 'div', $element ).each( function(){
+        $( this ).replaceWith( $( this ).html()+'\n' );
+    });
+
+    $( tags_block_level.join(', '), $element ).each( function(){
+        $( this ).replaceWith( $( this ).html()+'\n\n' );
+    });
+
+    // strip the following tags and any contents
+    $( tags_strip.join(', ' ), $element ).remove();
+
+    // replace ul and ol tags
+    replaceUls( $element );
+
+    $( 'br', $element ).each( function(){
+        $( this ).replaceWith( '\n' );
+    });
+
+    // fetch the html
+    var html = $element.html();
+
+    // strip some excess white space
+    //html = html.replace( /\n +/g, '\n' );
+    html = html.replace( /&nbsp;/g, ' ');
+    html = html.replace( /^ +/g, '' );
+    html = html.replace( / +$/g, '' );
+
+    // return the html
+    return html;
+}
+
+/**
+ * Convert ul and ol tags into plain text alternatives
+ *
+ * This function is recursive and will support nested bullet points
+ */
+function replaceUls( $element, indent, number )
+{
+    // our tab character
+    var tab = '   ';
+
+    if( ! indent ) indent = 1;
+    if( ! number ) number = 0;
+
+    var endcap = indent > 1 ? '' : '\n\n';
+    var prefix = indent > 1 ? '\n\n' : '';
+
+    var indentStr = new Array( indent+1 ).join( tab );
+
+    // iterate over OL tags
+    $( '> OL', $element ).each( function( index, ol ){
+
+        $( '> li', $( ol ) ).each( function( index, li ){
+
+            // we use numbered strings like '3.2.1' to show numbering nesting
+            var olnumber = index+1;
+            if( number ) olnumber = number + '.' + olnumber;
+
+            // replace any child tags
+            replaceUls( $( this ), indent + 1, olnumber );
+
+            // create the bullet
+            var bullet = prefix+indentStr+olnumber+'. '+$( li ).text() + endcap;
+            $( li ).replaceWith( bullet );
+        });
+
+        $( ol ).replaceWith( $( ol ).html() );
+    });
+
+    // iterate over UL tags
+    $( '> UL', $element ).each( function( index, ul ){
+
+        $( '> li', $( ul ) ).each( function( index, li ){
+
+            // replace any child tags
+            replaceUls( $( this ), indent + 1 );
+
+            var bullet = prefix+indentStr+'-  '+$( li ).text() + endcap;
+            $( li ).replaceWith( bullet );
+        });
+
+        $( ul ).replaceWith( $( ul ).html() );
+    });
+}
+function dateFormat (date, fstr, utc) {
+    utc = utc ? 'getUTC' : 'get';
+    return fstr.replace (/%*[AYymdHhiMSuq]/g, function (m) {
+        switch (m) {
+            case '%q': return new Date(date[utc + 'FullYear'] (), 1+date[utc + 'Month'] (), 0).getDate();
+            case '%y': return date[utc + 'FullYear'] ().toString().substring(2); // no leading zeros required
+            case '%Y': return date[utc + 'FullYear'] (); // no leading zeros required
+            case '%m': m = 1 + date[utc + 'Month'] (); break;
+            case '%M': m = 1 + date[utc + 'Month'] (); m = m < 10 ? '0'+m : m; break;
+            case '%d': m = date[utc + 'Date'] (); break;
+            case '%H': m = date[utc + 'Hours'] (); break;
+            case '%h': m = date[utc + 'Hours'] () % 12 || 12; break;
+            case '%i': m = date[utc + 'Minutes'] (); break;
+            case '%S': m = date[utc + 'Seconds'] (); break;
+            case '%u': return date[utc + 'Milliseconds'] (); break;
+            case '%A': return date[utc + 'Hours'] () >= 12 ? 'PM' : 'AM'; break;
+
+            case 'q': return new Date(date[utc + 'FullYear'] (), 1+date[utc + 'Month'] (), 0).getDate();
+            case 'y': return date[utc + 'FullYear'] ().toString().substring(2); // no leading zeros required
+            case 'Y': return date[utc + 'FullYear'] (); // no leading zeros required
+            case 'm': m = 1 + date[utc + 'Month'] (); break;
+            case 'M': m = 1 + date[utc + 'Month'] (); m = m < 10 ? '0'+m : m; break;
+            case 'd': m = date[utc + 'Date'] (); break;
+            case 'H': m = date[utc + 'Hours'] (); break;
+            case 'h': m = date[utc + 'Hours'] () % 12 || 12; break;
+            case 'i': m = date[utc + 'Minutes'] (); break;
+            case 'S': m = date[utc + 'Seconds'] (); break;
+            case 'u': return date[utc + 'Milliseconds'] (); break;
+            case 'A': return date[utc + 'Hours'] () >= 12 ? 'PM' : 'AM'; break;
+            default: return m.slice (1); // unknown code, remove %
+        }
+        // add leading zero if required
+        return ('0' + m).slice (-2);
+    });
+}
+
+function helperArrayIntersect(arr1, arr2) {
+	let result = [];
+
+	for (let elem of arr1) {
+		if (inArray(elem, arr2)) {
+			result.push(elem);
+		}
+	}
+
+	return result;
+}
+
+function inArray(elem, arr){
+	return arr.indexOf(elem) !== -1;
+}
+
+function CheckLocalStorage()
+{
+    if (typeof localStorage === 'object') {
+        try {
+            localStorage.setItem('localStorage', 1);
+            localStorage.removeItem('localStorage');
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+    return false;
+}
+function get_object_len(obj)
+{
+    var count = 0;
+    var i;
+
+    for (i in obj) {
+        if (obj.hasOwnProperty(i)) {
+            count++;
+        }
+    }
+    return count;
+}
+function object_join(obj,str)
+{
+    var res = '';
+    var i;
+
+    for (i in obj) {
+        if (obj.hasOwnProperty(i)) {
+            res += (res.length ? str : '')+obj[i];
+        }
+    }
+    return res;
+}
+Cookies = {
+    Get : function (name,type) {
+        type = type ? type : 'str';
+        var matches = document.cookie.match(new RegExp(
+            "(?:^|; )" + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + "=([^;]*)"
+        ));
+        var val = matches ? decodeURIComponent(matches[1]) : null;
+        if(type == 'int')
+        {
+            val = parseInt(val);
+            return isNaN(val) ? 0 : val;
+        }
+        return val;
+    },
+    Set : function(name, value, options) {
+        options = options || {};
+
+        var expires = options.expires;
+
+        if (typeof expires == "number" && expires) {
+            var d = new Date();
+            d.setTime(d.getTime() + expires * 1000);
+            expires = options.expires = d;
+        }
+        if (expires && expires.toUTCString) {
+            options.expires = expires.toUTCString();
+        }
+
+        value = encodeURIComponent(value);
+
+        var updatedCookie = name + "=" + value;
+
+        for (var propName in options) {
+            updatedCookie += "; " + propName;
+            var propValue = options[propName];
+            if (propValue !== true) {
+                updatedCookie += "=" + propValue;
+            }
+        }
+
+        document.cookie = updatedCookie;
+    },
+    Delete : function(name) {
+        this.Set(name, "", {
+            expires: -1,
+        })
+    }
+};
+var LocalStorageLib = {
+    CheckOn: function () {
+        if(!window.localStorage)
+        {
+            return false;
+        }
+
+        return true;
+
+
+    },
+    Set: function (k,v,ttl) {
+        if(!this.CheckOn())
+        {
+            return false;
+        }
+
+        window.localStorage.setItem(k, JSON.stringify({
+            'tstamp': GetCurrentTstamp(),
+            'ttl': ttl ? parseInt(ttl) : 0,
+            'data': v
+        }));
+    },
+    Get: function (k) {
+        if(!this.CheckOn())
+        {
+            return false;
+        }
+        let d = window.localStorage.getItem(k);
+        if(!d)
+        {
+            return false;
+        }
+        d = JSON.parse(d);
+        if(!d.tstamp || !d.data)
+        {
+            return false;
+        }
+        if(d.ttl && GetCurrentTstamp() > d.tstamp+d.ttl)
+        {
+           // console.log('[LSL] key '+k+'  is expired; delete')
+            this.Delete(k)
+            return false;
+        }
+        return d.data;
+
+    },
+    Delete: function (k) {
+        if(!this.CheckOn())
+        {
+            return false;
+        }
+        window.localStorage.removeItem(k);
+    },
+}
+function LoadAsset(url)
+{
+    let ext = url.match(/[^\.]+$/).toString().toLowerCase();
+    if(ext == 'css')
+    {
+        AppendCssFile(url)
+    }
+    if(ext == 'js')
+    {
+        AppendJsFile(url)
+    }
+
+}
+function AppendJsFile(scriptUrl)
+{
+    const oldScript = Array.from(document.scripts).find(
+        s => s.src.includes(scriptUrl)
+    );
+
+    if (oldScript) {
+        oldScript.parentNode.removeChild(oldScript);
+        // console.log('Старый скрипт удалён');
+    }
+
+// Создаём и добавляем новый тег
+    const newScript = document.createElement('script');
+    newScript.src = scriptUrl + '?v=' + new Date().getTime(); // добавляем параметр, чтобы обойти кеш
+    newScript.onload = () => {
+        // console.log('Скрипт перезагружен');
+    };
+    document.head.appendChild(newScript);
+}
+function AppendCssFile(cssUrl)
+{
+
+// Ищем и удаляем старую ссылку
+    const oldLink = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+        .find(link => link.href.includes(cssUrl));
+
+    if (oldLink) {
+        // oldLink.parentNode.removeChild(oldLink);
+        // console.log('Старый CSS удалён');
+        return;
+    }
+
+// Создаём и добавляем новый <link> с параметром, чтобы обойти кеш
+    const newLink = document.createElement('link');
+    newLink.rel = 'stylesheet';
+    newLink.href = cssUrl + '?v=' + new Date().getTime();
+    newLink.onload = () => {
+        // console.log('CSS перезагружен');
+    };
+    document.head.appendChild(newLink);
+
+}
+function AddNotification(text,type,id)
+{
+    if(!id)
+    {
+        id = 'NOTIFICATION_CLIENT'+Math.random().toString(36).substring(7);
+    }
+    if($('#'+id+':visible').length)
+    {
+        return;
+    }
+    var icon      = 'fas fa-check-circle';
+    var css_class = 'n_green';
+    if(type == 'error')
+    {
+        icon      = 'fas fa-minus-circle';
+        css_class = 'n_red';
+    }
+    else if(type == 'notice')
+    {
+        icon      = 'fas fa-info-circle';
+        css_class = 'n_blue';
+    }
+    else if(type == 'warning')
+    {
+        icon      = 'fas fa-exclamation-circle';
+        css_class = 'n_yellow';
+    }
+    $('div.notifications > .wrapper')
+        .append('<div class="noti_wrap '+css_class+'" id="'+id+'" style="display: block; ">' +
+            '<div class="text">'+text+'</div>' +
+            '<i class="icon '+icon+'"></i><a href="#" class="n_close"><i class="icon fa fa-times"></i></a>' +
+            '</div>');
+    $('div.notifications').fadeIn();
+    if(!window.op_AddNotification)
+    {
+        $('#' + id + ' .n_close').click(function () {
+            $(this).parent().remove();
+            setTimeout(function () {
+                if (window.mainContMinH)
+                {
+                    mainContMinH();
+                }
+                $(window).trigger('resize');
+            }, 450);
+
+        });
+    }
+    setTimeout(function() {
+        if(window.mainContMinH)
+        {
+            mainContMinH();
+        }
+        $(window).trigger('resize');
+    }, 450);
+
+}
+//функция проверяет, если сотрудник сейчас на странице чата
+function IsChatPage() {
+    return window.b_chat_page ? b_chat_page : false;
+}
+function IsActiveChatPage() {
+    return window.b_chat_page && !window.is_archive ? true : false;
+}
+var DMap = {0: 0, 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 7: 7, 8: 8, 9: 9, 10: 10, 11: 11, 12: 12, 13: 13, 14: 14, 15: 15, 16: 16, 17: 17, 18: 18, 19: 19, 20: 20, 21: 21, 22: 22, 23: 23, 24: 24, 25: 25, 26: 26, 27: 27, 28: 28, 29: 29, 30: 30, 31: 31, 32: 32, 33: 33, 34: 34, 35: 35, 36: 36, 37: 37, 38: 38, 39: 39, 40: 40, 41: 41, 42: 42, 43: 43, 44: 44, 45: 45, 46: 46, 47: 47, 48: 48, 49: 49, 50: 50, 51: 51, 52: 52, 53: 53, 54: 54, 55: 55, 56: 56, 57: 57, 58: 58, 59: 59, 60: 60, 61: 61, 62: 62, 63: 63, 64: 64, 65: 65, 66: 66, 67: 67, 68: 68, 69: 69, 70: 70, 71: 71, 72: 72, 73: 73, 74: 74, 75: 75, 76: 76, 77: 77, 78: 78, 79: 79, 80: 80, 81: 81, 82: 82, 83: 83, 84: 84, 85: 85, 86: 86, 87: 87, 88: 88, 89: 89, 90: 90, 91: 91, 92: 92, 93: 93, 94: 94, 95: 95, 96: 96, 97: 97, 98: 98, 99: 99, 100: 100, 101: 101, 102: 102, 103: 103, 104: 104, 105: 105, 106: 106, 107: 107, 108: 108, 109: 109, 110: 110, 111: 111, 112: 112, 113: 113, 114: 114, 115: 115, 116: 116, 117: 117, 118: 118, 119: 119, 120: 120, 121: 121, 122: 122, 123: 123, 124: 124, 125: 125, 126: 126, 127: 127, 1027: 129, 8225: 135, 1046: 198, 8222: 132, 1047: 199, 1168: 165, 1048: 200, 1113: 154, 1049: 201, 1045: 197, 1050: 202, 1028: 170, 160: 160, 1040: 192, 1051: 203, 164: 164, 166: 166, 167: 167, 169: 169, 171: 171, 172: 172, 173: 173, 174: 174, 1053: 205, 176: 176, 177: 177, 1114: 156, 181: 181, 182: 182, 183: 183, 8221: 148, 187: 187, 1029: 189, 1056: 208, 1057: 209, 1058: 210, 8364: 136, 1112: 188, 1115: 158, 1059: 211, 1060: 212, 1030: 178, 1061: 213, 1062: 214, 1063: 215, 1116: 157, 1064: 216, 1065: 217, 1031: 175, 1066: 218, 1067: 219, 1068: 220, 1069: 221, 1070: 222, 1032: 163, 8226: 149, 1071: 223, 1072: 224, 8482: 153, 1073: 225, 8240: 137, 1118: 162, 1074: 226, 1110: 179, 8230: 133, 1075: 227, 1033: 138, 1076: 228, 1077: 229, 8211: 150, 1078: 230, 1119: 159, 1079: 231, 1042: 194, 1080: 232, 1034: 140, 1025: 168, 1081: 233, 1082: 234, 8212: 151, 1083: 235, 1169: 180, 1084: 236, 1052: 204, 1085: 237, 1035: 142, 1086: 238, 1087: 239, 1088: 240, 1089: 241, 1090: 242, 1036: 141, 1041: 193, 1091: 243, 1092: 244, 8224: 134, 1093: 245, 8470: 185, 1094: 246, 1054: 206, 1095: 247, 1096: 248, 8249: 139, 1097: 249, 1098: 250, 1044: 196, 1099: 251, 1111: 191, 1055: 207, 1100: 252, 1038: 161, 8220: 147, 1101: 253, 8250: 155, 1102: 254, 8216: 145, 1103: 255, 1043: 195, 1105: 184, 1039: 143, 1026: 128, 1106: 144, 8218: 130, 1107: 131, 8217: 146, 1108: 186, 1109: 190}
+function UnicodeToWin1251(s) {
+
+    var L = []
+    // console.log(s);
+    for (var i=0; i<s.length; i++) {
+        var ord = s.charCodeAt(i)
+        // console.log(s[i]+'='+ord+'=%'+DMap[ord].toString(16));
+        if (!(ord in DMap))
+        {
+            // throw "Character "+s.charAt(i)+" isn't supported by win1251!";
+            continue;
+        }
+        if (ord==10)
+        {
+            L.push("\n");
+        }
+        else
+        {
+            L.push('%'+DMap[ord].toString(16));
+        }
+
+    }
+    let r = L.join('').toUpperCase();
+
+         // console.log(r);
+
+    return r;
+
+}
+
+function getRandomNumber(min, max) {
+    return parseInt(Math.random() * (max - min) + min);
+}
+
+function copyTextToClipboard(text) {
+    if (!navigator.clipboard) {
+        var textArea = document.createElement("textarea");
+        textArea.value = text;
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            var successful = document.execCommand('copy');
+            var msg = successful ? 'successful' : 'unsuccessful';
+            if(successful)
+            {
+                var audio = new Audio('/bundles/notification_sounds/copy_ticket_1.wav');
+                audio.play();
+            }
+            console.log('Fallback: Copying text command was ' + msg);
+        } catch (err) {
+            console.error('Fallback: Oops, unable to copy', err);
+        }
+
+        document.body.removeChild(textArea);
+        return;
+    }
+    navigator.clipboard.writeText(text).then(function() {
+        var audio = new Audio('/bundles/notification_sounds/copy_ticket_1.wav');
+        audio.play();
+
+        console.log('Async: Copying to clipboard was successful!');
+    }, function(err) {
+        console.error('Async: Could not copy text: ', err);
+    });
+
+}
+function InitCsrfToken()
+{
+    if(!window.g_csrf_token)
+    {
+        RefreshCsrfToken()
+    }
+    $(document).on('submit', 'form', function () {
+        $(this).append('<input type="hidden" name="_csrf_token" value="'+g_csrf_token+'"/>');
+    });
+    $.ajaxSetup({
+        beforeSend: function(xhr, settings) {
+            if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type)) {
+                xhr.setRequestHeader('X-CSRF-Token', g_csrf_token);
+            }
+        }
+    });
+
+    // if(window.Worker)
+    // {
+    //     const worker = new Worker('/bundles/common/worker_csrf.js');
+    //     worker.postMessage({
+    //         url: '/update_csrf_token',
+    //         interval: 2*60*1000
+    //     });
+    //
+    //
+    //     worker.onmessage = (event) => {
+    //         const {token, error} = event.data;
+    //         if (token)
+    //         {
+    //             window.g_csrf_token_tstamp = GetCurrentTstamp();
+    //             g_csrf_token = token
+    //         }
+    //         else if (error)
+    //         {
+    //             console.warn('Ошибка обновления токена:', error);
+    //         }
+    //     };
+    // }
+    // else
+    // {
+        setInterval(function () {
+            if((!window.g_csrf_token_tstamp
+                || GetCurrentTstamp() - g_csrf_token_tstamp >= 120))
+            {
+                RefreshCsrfToken()
+            }
+        }, 500);
+    // }
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            RefreshCsrfToken()
+        }
+    });
+
+    if(window.xajax)
+    {
+        var originalXajaxRequest = xajax.request;
+        xajax.request = function (objFunction, objOptions) {
+            if (!window.g_csrf_token
+              || (window.g_csrf_token_tstamp && GetCurrentTstamp() - g_csrf_token_tstamp > 300))
+            {
+                RefreshCsrfToken(function () {
+                    originalXajaxRequest.call(xajax, objFunction, objOptions);
+                });
+                return;
+            }
+            return originalXajaxRequest.call(xajax, objFunction, objOptions);
+        };
+    }
+
+}
+function RefreshCsrfToken(callback)
+{
+    $.post('/update_csrf_token', {'_csrf_token': window.g_csrf_token||'init'}, function (r, status, xhr) {
+        window.g_csrf_token_tstamp = GetCurrentTstamp();
+        window.g_csrf_token = true;//xhr.getResponseHeader('X-CSRF-Token');
+        if(callback)
+        {
+            callback(g_csrf_token);
+        }
+    })
+
+}// Translation function
+function _Translate(code, replace = {},def) // code format - 'section/variable'
+{
+  if(window.LangTranslations)
+  {
+   let code_arr = code.split('/');
+   let section = code_arr[0];
+   if(!window.LangTranslations[section]
+   && window.LangTranslations[section+'_js'])
+   {
+       section += '_js';
+   }
+   let variable = code_arr[1];
+   if(window.LangTranslations[section] && window.LangTranslations[section][variable])
+   {
+     return formatlangString(window.LangTranslations[section][variable], replace);
+   }
+  }
+  if(def)
+  {
+      return def;
+  }
+  return 'UNKNOWN('+ code + ')';
+    // console.log('UNKNOWN(' + code + ')');
+    // return null;
+}
+function t_getByNum(num, t_arr)
+{
+    let n = num.toString();
+    n= n.substring(n.length-1);
+    if(n==1)
+    {
+        return t_arr[0];
+    }
+    else if(n>1 && n<5)
+    {
+        return t_arr[1];
+    }
+    else
+    {
+        return t_arr[2]
+    }
+}
+window.t = _Translate;
+
+function GetBrowserLang(b_get_id,b_support) {
+    let langs_id = window.g_lang_list_short||{
+       'ru' : 1,
+       'en' : 2,
+       'tr' : 3
+    };
+    var language = window.navigator ? (window.navigator.language ||
+        window.navigator.systemLanguage ||
+        window.navigator.userLanguage) : "ru";
+    if(self.support_lang)
+    {
+        language = self.support_lang;
+    }
+    let key = language.substr(0, 2).toLowerCase();
+    if(!b_get_id)
+    {
+        return key;
+    }
+    if(langs_id[key])
+    {
+        return langs_id[key]
+    }
+    if(b_support)
+    {
+        return false;
+    }
+
+    return window._g_cluster && _g_cluster == 'ru' ? langs_id['ru'] : langs_id['en']
+}
+
+function formatlangString(string, replace)
+{
+  var default_replace = {
+    "br": "<br />",
+    "strong" : "<strong>",
+    "/strong" : "</strong>",
+    "span" : "<span>",
+    "/span" : "</span>",
+    "p" : "<p>",
+    "/p" : "</p>",
+    "i" : "<i>",
+    "/i" : "</i>",
+    "em" : "<em>",
+    "/em" : "</em>",
+    "b"  : "<b>",
+    "/b" : "</b>",
+  };
+
+  var new_replace = Object.assign(default_replace, replace);
+  let new_obj = {};
+  let keys = [];
+  for(let key in new_replace)
+  {
+    keys.push("\\["+key+'\\]');
+    new_obj['['+key+']'] = new_replace[key];
+  }
+  let replace_key = keys.join('|');
+  var re = new RegExp(replace_key,"g");
+  let str_ready = string.replace(re, function (x) {
+    return new_obj[x];
+  // return decodeHTMLEntities(new_obj[x]);
+});
+    str_ready = str_ready.replace(/&quot;/g,'"');
+    str_ready = str_ready.replace(/&#039;/g,'\'');
+  return str_ready;
+}
+
+function stripslashes (str) {
+
+  return (str + '').replace(/\\(.?)/g, function (s, n1) {
+    switch (n1) {
+    case '\\':
+      return '\\';
+    case '0':
+      return '\u0000';
+    case '':
+      return '';
+    default:
+      return n1;
+    }
+  });
+}
+
+var entities = {
+  'amp': '&',
+  'apos': '\'',
+  '#x27': '\'',
+  '#x2F': '/',
+  '#39': '\'',
+  '#47': '/',
+  'lt': '<',
+  'gt': '>',
+  'nbsp': ' ',
+  'quot': '"'
+}
+
+function decodeHTMLEntities (text) {
+let element = document.createElement("div");
+element.innerHTML = text;
+str = element.innerText;
+return str;
+}
+var Translate = t;
+function RoundFloat(n,d)
+{
+    return parseFloat((Math.round(n * 10**d) / 10**d).toFixed(d)).toString();
+}
+
+String.prototype.turkishToUpper = function(){
+    var string = this;
+    var letters = { "i": "İ", "ş": "Ş", "ğ": "Ğ", "ü": "Ü", "ö": "Ö", "ç": "Ç", "ı": "I" };
+    string = string.replace(/(([iışğüçö]))+/g, function(letter){ return letters[letter]; })
+    return string.toUpperCase();
+}
+
+String.prototype.turkishToLower = function(){
+    var string = this;
+    var letters = { "İ": "i", "I": "ı", "Ş": "ş", "Ğ": "ğ", "Ü": "ü", "Ö": "ö", "Ç": "ç" };
+    string = string.replace(/(([İIŞĞÜÇÖ]))+/g, function(letter){ return letters[letter]; })
+    return string.toLowerCase();
+}
