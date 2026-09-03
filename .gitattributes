@@ -1,0 +1,11 @@
+# Normalize line endings for text files, avoid CRLF/LF warnings on Windows
+* text=auto eol=lf
+
+# Binary files — never touch line endings
+*.xlsx binary
+*.xlsm binary
+*.docx binary
+*.pptx binary
+*.pdf binary
+*.png binary
+*.ttf binary
